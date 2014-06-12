@@ -1,5 +1,11 @@
-(function($){
-  $.fn.rowGrid = function( options ) {
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+    define(['jquery'], factory);
+  } else {
+    factory(jQuery);
+  }
+}(function ($) {
+  $.fn.rowGrid = function(options) {
     return this.each(function() {
       $this = $(this);
       if(options === 'appended') {
@@ -7,11 +13,14 @@
         var $lastRow = $this.children('.' + options.lastRowClass);
         var items = $lastRow.nextAll().add($lastRow);
         layout(this, options, items);
+      } else if(options === 'refresh') {
+        options = $this.data('grid-options');
+        layout(this, options);
       } else {
-        options = $.extend( {}, $.fn.rowGrid.defaults, options );
+        options = $.extend({}, $.fn.rowGrid.defaults, options);
         $this.data('grid-options', options);
         layout(this, options);
-        
+
         if(options.resize) {
           $(window).on('resize.rowGrid', {container: this}, function(event) {
             layout(event.data.container, options);
@@ -20,7 +29,7 @@
       }
     });
   };
-  
+
   $.fn.rowGrid.defaults = {
     minMargin: null,
     maxMargin: null,
@@ -28,9 +37,11 @@
     lastRowClass: 'last-row',
     firstItemClass: null
   };
- 
+
   function layout(container, options, items) {
     var rowWidth = 0,
+        once = 0,
+        maxHeight = [],
         rowElems = [],
         items = items || container.querySelectorAll(options.itemSelector),
         itemsSize = items.length;
@@ -53,7 +64,8 @@
     for(var i = 0; i < itemsSize; ++i) {
       itemAttrs[i] = {
         outerWidth: items[i].offsetWidth,
-        height: items[i].offsetHeight
+        height: items[i].getElementsByTagName('img')[0].offsetHeight
+        //height: items[i].offsetHeight
       };
     }
 
@@ -61,18 +73,18 @@
     for(var index = 0; index < itemsSize; ++index) {
       rowWidth += itemAttrs[index].outerWidth;
       rowElems.push(items[index]);
-      
+
       // check if it is the last element
       if(index === itemsSize - 1) {
         for(var rowElemIndex = 0; rowElemIndex<rowElems.length; rowElemIndex++) {
-          // if first element in row 
+          // if first element in row
           if(rowElemIndex === 0) {
             rowElems[rowElemIndex].className += ' ' + options.lastRowClass;
           }
           rowElems[rowElemIndex].style.marginRight = (rowElemIndex < rowElems.length - 1)?options.minMargin+'px' : 0;
         }
-      }      
-      
+      }
+
       // check whether width of row is too high
       if(rowWidth + options.maxMargin * (rowElems.length - 1) > containerWidth) {
         var diff = rowWidth + options.maxMargin * (rowElems.length - 1) - containerWidth;
@@ -87,12 +99,26 @@
           diff = 0;
         }
         var rowElem,
-          widthDiff = 0;
+            average,
+            widthDiff = 0;
         for(var rowElemIndex = 0; rowElemIndex<rowElems.length; rowElemIndex++) {
           rowElem = rowElems[rowElemIndex];
           var rowElemWidth = itemAttrs[index+parseInt(rowElemIndex)-rowElems.length+1].outerWidth;
           var newWidth = rowElemWidth - (rowElemWidth / rowWidth) * diff;
           var newHeight = Math.round(itemAttrs[index+parseInt(rowElemIndex)-rowElems.length+1].height * (newWidth / rowElemWidth));
+
+          if (rowElemIndex === 0 && once === 0) {
+            once = 1;
+            maxHeight.push(newHeight);
+          } else if (rowElemIndex === 0 && once > 0) {
+            average = ~~(_.reduce(maxHeight, function(a, b) { return a + b; }, 0) / maxHeight.length);
+            //average = _.min(maxHeight);
+            maxHeight.length = 0;
+            maxHeight.push(newHeight);
+          } else {
+            maxHeight.push(newHeight);
+          }
+
           if (widthDiff + 1 - newWidth % 1 >= 0.5 ) {
             widthDiff -= newWidth % 1;
             newWidth = Math.floor(newWidth);
@@ -100,9 +126,10 @@
             widthDiff += 1 - newWidth % 1;
             newWidth = Math.ceil(newWidth);
           }
+
           rowElem.style.cssText =
               'width: ' + newWidth + 'px;' +
-              'height: ' + newHeight + 'px;' +
+              'height: ' + average + 'px;' +
               'margin-right: ' + ((rowElemIndex < rowElems.length - 1)?rowMargin : 0) + 'px';
           if(rowElemIndex === 0) {
             rowElem.className += ' ' + options.firstItemClass;
@@ -113,4 +140,4 @@
       }
     }
   }
-})(jQuery);
+}));
